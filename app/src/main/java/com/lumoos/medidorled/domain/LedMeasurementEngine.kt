@@ -10,9 +10,11 @@ import kotlin.math.max
  * Every following OFF -> ON edge completes one revolution.
  */
 class LedMeasurementEngine(
-    threshold: Float = 128f,
+    threshold: Float = 20f,
     hysteresis: Float = 2f,
-    private val debounceNs: Long = 60_000_000L
+    // El video real del medidor muestra pulsos de aprox. 30–50 ms.
+    // 12 ms exige al menos dos cuadros consecutivos a 60 fps, pero no pierde el pulso.
+    private val debounceNs: Long = 12_000_000L
 ) {
     var threshold: Float = threshold
         private set
