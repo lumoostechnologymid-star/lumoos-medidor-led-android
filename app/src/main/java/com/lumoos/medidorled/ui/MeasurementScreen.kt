@@ -179,19 +179,30 @@ fun MeasurementScreen(controller: LedMeasurementController) {
                     }
 
                     Text("Filtro solar: ACTIVO · compara el centro con la luz alrededor")
-                    Text("Brillo del centro: ${state.brightness.toInt()} / 255")
-                    Text("Señal filtrada: ${state.signal.toInt()} / 255")
+                    MetricRow("Brillo del centro", String.format(Locale.US, "%.1f", state.brightness))
+                    MetricRow("Señal actual", String.format(Locale.US, "%.1f", state.signal))
+                    MetricRow("ENCENDIDO desde", String.format(Locale.US, "%.1f", state.onThreshold))
+                    MetricRow("APAGADO debajo de", String.format(Locale.US, "%.1f", state.offThreshold))
+
                     LinearProgressIndicator(
                         progress = { (state.signal / 255f).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text("Umbral de encendido: ${state.threshold.toInt()}")
+
+                    Text("Umbral central: ${String.format(Locale.US, "%.1f", state.threshold)}")
                     Slider(
                         value = state.threshold,
                         onValueChange = controller::setThreshold,
-                        valueRange = 80f..220f,
+                        valueRange = 0f..255f,
+                        steps = 254,
                         enabled = !state.locked && !state.calibrating
                     )
+
+                    Text(
+                        "Puedes mover el umbral hasta valores muy bajos. Lo ideal es dejarlo entre la señal que ves con el LED apagado y la señal con el LED prendido.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+
                     if (state.calibrating) {
                         LinearProgressIndicator(
                             progress = { state.calibrationProgress },
