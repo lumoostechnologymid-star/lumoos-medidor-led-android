@@ -8,12 +8,12 @@ plugins {
 
 android {
     namespace = "com.lumoos.medidorled"
-    compileSdk = 37
+    compileSdk = 36
 
     defaultConfig {
         applicationId = "com.lumoos.medidorled"
         minSdk = 23
-        targetSdk = 37
+        targetSdk = 36
         versionCode = 1
         versionName = "0.1.0"
     }
