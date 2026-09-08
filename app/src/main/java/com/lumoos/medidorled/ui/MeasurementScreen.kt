@@ -32,10 +32,10 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -68,8 +68,8 @@ fun MeasurementScreen(controller: LedMeasurementController) {
     }
 
     val analyzer: ImageAnalysis.Analyzer = remember(controller) {
-        LedFrameAnalyzer { luma, timestampNs ->
-            mainExecutor.execute { controller.onLuma(luma, timestampNs) }
+        LedFrameAnalyzer { sample ->
+            mainExecutor.execute { controller.onFrame(sample) }
         }
     }
 
@@ -153,19 +153,43 @@ fun MeasurementScreen(controller: LedMeasurementController) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier.padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text("Detección del LED", fontWeight = FontWeight.SemiBold)
-                    Text("Brillo actual: ${state.brightness.toInt()} / 255")
+                    Text("Color / tipo del LED")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterChip(
+                            selected = state.ledColorMode == LedColorMode.YELLOW,
+                            onClick = { controller.setLedColorMode(LedColorMode.YELLOW) },
+                            enabled = !state.locked && !state.calibrating,
+                            label = { Text("Amarillo") }
+                        )
+                        FilterChip(
+                            selected = state.ledColorMode == LedColorMode.RED,
+                            onClick = { controller.setLedColorMode(LedColorMode.RED) },
+                            enabled = !state.locked && !state.calibrating,
+                            label = { Text("Rojo") }
+                        )
+                        FilterChip(
+                            selected = state.ledColorMode == LedColorMode.INFRARED,
+                            onClick = { controller.setLedColorMode(LedColorMode.INFRARED) },
+                            enabled = !state.locked && !state.calibrating,
+                            label = { Text("Infrarrojo") }
+                        )
+                    }
+
+                    Text("Filtro solar: ACTIVO · compara el centro con la luz alrededor")
+                    Text("Brillo del centro: ${state.brightness.toInt()} / 255")
+                    Text("Señal filtrada: ${state.signal.toInt()} / 255")
                     LinearProgressIndicator(
-                        progress = { (state.brightness / 255f).coerceIn(0f, 1f) },
+                        progress = { (state.signal / 255f).coerceIn(0f, 1f) },
                         modifier = Modifier.fillMaxWidth()
                     )
-                    Text("Umbral: ${state.threshold.toInt()}")
+                    Text("Umbral de encendido: ${state.threshold.toInt()}")
                     Slider(
                         value = state.threshold,
                         onValueChange = controller::setThreshold,
-                        valueRange = 20f..240f,
+                        valueRange = 80f..220f,
                         enabled = !state.locked && !state.calibrating
                     )
                     if (state.calibrating) {
@@ -179,6 +203,12 @@ fun MeasurementScreen(controller: LedMeasurementController) {
                         enabled = !state.locked && !state.calibrating
                     ) {
                         Text(if (state.calibrating) "Calibrando…" else "Calibrar automáticamente (3 s)")
+                    }
+                    if (state.ledColorMode == LedColorMode.INFRARED) {
+                        Text(
+                            "Nota: algunos teléfonos tienen un filtro físico que reduce la luz infrarroja; si la señal casi no cambia, prueba acercando la cámara.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
                     }
                 }
             }
@@ -243,7 +273,7 @@ fun MeasurementScreen(controller: LedMeasurementController) {
             }
 
             Text(
-                "Consejo: mantén el recuadro blanco centrado sobre el LED y evita reflejos fuertes. Para mayor precisión usa varias vueltas.",
+                "Consejo: coloca el LED dentro del recuadro pequeño y procura que el recuadro grande vea el entorno inmediato. El filtro solar usa esa diferencia para evitar contar cambios generales de luz como pulsos.",
                 style = MaterialTheme.typography.bodySmall
             )
             Spacer(Modifier.height(24.dp))
@@ -259,4 +289,5 @@ private fun MetricRow(label: String, value: String) {
     }
 }
 
-private fun formatSeconds(value: Double): String = String.format(Locale.US, "%.3f s", value)
+private fun formatSeconds(seconds: Double): String =
+    String.format(Locale.US, "%.3f s", seconds)

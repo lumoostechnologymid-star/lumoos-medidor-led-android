@@ -76,6 +76,13 @@ fun CameraPreview(
             factory = { previewView },
             modifier = Modifier.fillMaxSize()
         )
+        // Recuadro grande: zona de referencia para luz ambiente / sol.
+        Box(
+            modifier = Modifier
+                .size(138.dp)
+                .border(1.dp, Color.White.copy(alpha = 0.45f))
+        )
+        // Recuadro pequeño: aquí debe quedar el LED.
         Box(
             modifier = Modifier
                 .size(74.dp)

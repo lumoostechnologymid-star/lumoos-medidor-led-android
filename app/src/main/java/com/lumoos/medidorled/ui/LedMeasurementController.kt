@@ -3,10 +3,17 @@ package com.lumoos.medidorled.ui
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import com.lumoos.medidorled.camera.LedFrameSample
 import com.lumoos.medidorled.domain.LedMeasurementEngine
 
+enum class LedColorMode {
+    YELLOW,
+    RED,
+    INFRARED
+}
+
 class LedMeasurementController {
-    private val engine = LedMeasurementEngine()
+    private var engine = LedMeasurementEngine(threshold = 140f, hysteresis = 8f)
 
     var state by mutableStateOf(MeasurementUiState())
         private set
@@ -23,6 +30,29 @@ class LedMeasurementController {
     fun setTargetRevolutions(value: Int) {
         if (state.locked) return
         state = state.copy(targetRevolutions = value.coerceIn(1, 999))
+    }
+
+    fun setLedColorMode(mode: LedColorMode) {
+        if (state.locked || state.calibrating || state.ledColorMode == mode) return
+        engine = LedMeasurementEngine(threshold = 140f, hysteresis = 8f)
+        calibrationStartNs = null
+        state = state.copy(
+            ledColorMode = mode,
+            threshold = 140f,
+            signal = 128f,
+            ledKnown = false,
+            ledOn = false,
+            revolutions = 0,
+            elapsedSeconds = 0.0,
+            lastRevolutionSeconds = 0.0,
+            resultKw = null,
+            status = "Listo para medir",
+            message = when (mode) {
+                LedColorMode.YELLOW -> "Modo amarillo activado · filtro solar activo"
+                LedColorMode.RED -> "Modo rojo activado · filtro solar activo"
+                LedColorMode.INFRARED -> "Modo infrarrojo activado · se detectará contraste de brillo"
+            }
+        )
     }
 
     fun setThreshold(value: Float) {
@@ -55,36 +85,50 @@ class LedMeasurementController {
         state = state.copy(
             calibrating = true,
             calibrationProgress = 0f,
-            message = "Mantén el recuadro sobre el LED durante 3 segundos"
+            message = "Mantén el LED dentro del recuadro y deja que prenda/apague durante 3 segundos"
         )
     }
 
-    fun onLuma(luma: Float, timestampNs: Long) {
-        var next = state.copy(brightness = luma)
+    fun onFrame(sample: LedFrameSample) {
+        val selectedSignal = when (state.ledColorMode) {
+            LedColorMode.YELLOW -> sample.yellowSignal
+            LedColorMode.RED -> sample.redSignal
+            LedColorMode.INFRARED -> sample.infraredSignal
+        }
+
+        var next = state.copy(
+            brightness = sample.centerLuma,
+            signal = selectedSignal
+        )
 
         if (next.calibrating) {
-            val start = calibrationStartNs ?: timestampNs.also { calibrationStartNs = it }
-            calibrationMin = minOf(calibrationMin, luma)
-            calibrationMax = maxOf(calibrationMax, luma)
-            val elapsed = (timestampNs - start) / 1_000_000_000f
+            val start = calibrationStartNs ?: sample.timestampNs.also { calibrationStartNs = it }
+            calibrationMin = minOf(calibrationMin, selectedSignal)
+            calibrationMax = maxOf(calibrationMax, selectedSignal)
+            val elapsed = (sample.timestampNs - start) / 1_000_000_000f
             next = next.copy(calibrationProgress = (elapsed / 3f).coerceIn(0f, 1f))
 
             if (elapsed >= 3f) {
                 val range = calibrationMax - calibrationMin
-                if (range >= 15f) {
+                if (range >= 10f) {
                     val threshold = (calibrationMin + calibrationMax) / 2f
-                    engine.setSensitivity(threshold)
+                    val hysteresis = (range * 0.12f).coerceIn(5f, 18f)
+                    engine.setSensitivity(threshold, hysteresis)
                     next = next.copy(
                         calibrating = false,
                         threshold = threshold,
                         calibrationProgress = 1f,
-                        message = "Calibración lista · umbral ${threshold.toInt()}"
+                        message = "Calibración lista · señal ${calibrationMin.toInt()}–${calibrationMax.toInt()} · umbral ${threshold.toInt()}"
                     )
                 } else {
                     next = next.copy(
                         calibrating = false,
                         calibrationProgress = 0f,
-                        message = "No detecté suficiente cambio de luz. Acerca más la cámara al LED e intenta de nuevo."
+                        message = if (next.ledColorMode == LedColorMode.INFRARED) {
+                            "No detecté suficiente contraste infrarrojo. Acerca la cámara; algunos teléfonos filtran la luz IR."
+                        } else {
+                            "No detecté suficiente cambio del LED. Centra mejor el recuadro y vuelve a calibrar."
+                        }
                     )
                 }
                 calibrationStartNs = null
@@ -92,7 +136,7 @@ class LedMeasurementController {
         }
 
         state = next
-        apply(engine.onLuma(luma, timestampNs), preserveMessage = true)
+        apply(engine.onLuma(selectedSignal, sample.timestampNs), preserveMessage = true)
     }
 
     private fun apply(snapshot: LedMeasurementEngine.Snapshot, preserveMessage: Boolean = false) {
@@ -117,6 +161,8 @@ data class MeasurementUiState(
     val targetRevolutions: Int = 5,
     val threshold: Float = 140f,
     val brightness: Float = 0f,
+    val signal: Float = 128f,
+    val ledColorMode: LedColorMode = LedColorMode.YELLOW,
     val ledOn: Boolean = false,
     val ledKnown: Boolean = false,
     val armed: Boolean = false,
