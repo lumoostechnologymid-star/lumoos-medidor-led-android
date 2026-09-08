@@ -7,15 +7,12 @@ import kotlin.math.min
 
 /**
  * Analiza una zona pequeña al centro y la compara con un anillo alrededor.
- * Esto ayuda a rechazar cambios de iluminación ambiente (por ejemplo, sol o nubes),
- * porque esos cambios afectan tanto el centro como el entorno, mientras que el LED
- * debe estar concentrado dentro del recuadro central.
- *
- * No se guarda ningún fotograma ni se envía ninguna imagen fuera del teléfono.
+ * Para LEDs pequeños no promedia todo el centro: usa el promedio de los píxeles
+ * más intensos, evitando que el destello se diluya dentro del recuadro.
  */
 class LedFrameAnalyzer(
-    private val centerFraction: Float = 0.12f,
-    private val ambientFraction: Float = 0.30f,
+    private val centerFraction: Float = 0.10f,
+    private val ambientFraction: Float = 0.28f,
     private val onSample: (LedFrameSample) -> Unit
 ) : ImageAnalysis.Analyzer {
 
@@ -42,17 +39,16 @@ class LedFrameAnalyzer(
             val outerRight = (outerLeft + outerWidth).coerceAtMost(width)
             val outerBottom = (outerTop + outerHeight).coerceAtMost(height)
 
-            var centerLuma = 0.0
-            var centerRed = 0.0
-            var centerYellow = 0.0
-            var centerCount = 0
+            val topLuma = TopAverage(16)
+            val topRed = TopAverage(16)
+            val topYellow = TopAverage(16)
 
             var ambientLuma = 0.0
             var ambientRed = 0.0
             var ambientYellow = 0.0
             var ambientCount = 0
 
-            val sampleStep = 3
+            val sampleStep = 2
             var y = outerTop
             while (y < outerBottom) {
                 var x = outerLeft
@@ -62,24 +58,20 @@ class LedFrameAnalyzer(
                         val rgb = if (uPlane != null && vPlane != null) {
                             val uValue = readPlaneValue(uPlane, x / 2, y / 2)
                             val vValue = readPlaneValue(vPlane, x / 2, y / 2)
-                            if (uValue != null && vValue != null) {
-                                yuvToRgb(yValue, uValue, vValue)
-                            } else {
-                                Rgb(yValue.toFloat(), yValue.toFloat(), yValue.toFloat())
-                            }
+                            if (uValue != null && vValue != null) yuvToRgb(yValue, uValue, vValue)
+                            else Rgb(yValue.toFloat(), yValue.toFloat(), yValue.toFloat())
                         } else {
                             Rgb(yValue.toFloat(), yValue.toFloat(), yValue.toFloat())
                         }
 
                         val redScore = (rgb.r - max(rgb.g, rgb.b) * 0.90f).coerceAtLeast(0f)
-                        val yellowScore = (min(rgb.r, rgb.g) - rgb.b * 0.85f).coerceAtLeast(0f)
+                        val yellowScore = (min(rgb.r, rgb.g) - rgb.b * 0.75f).coerceAtLeast(0f)
                         val isCenter = x in centerLeft until centerRight && y in centerTop until centerBottom
 
                         if (isCenter) {
-                            centerLuma += yValue
-                            centerRed += redScore
-                            centerYellow += yellowScore
-                            centerCount++
+                            topLuma.add(yValue.toFloat())
+                            topRed.add(redScore)
+                            topYellow.add(yellowScore)
                         } else {
                             ambientLuma += yValue
                             ambientRed += redScore
@@ -92,20 +84,21 @@ class LedFrameAnalyzer(
                 y += sampleStep
             }
 
-            if (centerCount == 0) return
+            if (topLuma.count == 0) return
 
-            val cLuma = (centerLuma / centerCount).toFloat()
-            val cRed = (centerRed / centerCount).toFloat()
-            val cYellow = (centerYellow / centerCount).toFloat()
+            val cLuma = topLuma.average()
+            val cRed = topRed.average()
+            val cYellow = topYellow.average()
 
-            val aLuma = if (ambientCount > 0) (ambientLuma / ambientCount).toFloat() else cLuma
-            val aRed = if (ambientCount > 0) (ambientRed / ambientCount).toFloat() else cRed
-            val aYellow = if (ambientCount > 0) (ambientYellow / ambientCount).toFloat() else cYellow
+            val aLuma = if (ambientCount > 0) (ambientLuma / ambientCount).toFloat() else 0f
+            val aRed = if (ambientCount > 0) (ambientRed / ambientCount).toFloat() else 0f
+            val aYellow = if (ambientCount > 0) (ambientYellow / ambientCount).toFloat() else 0f
 
-            val localLumaContrast = cLuma - aLuma
-            val redSignal = normalizeContrast((cRed - aRed) * 1.55f + localLumaContrast * 0.30f)
-            val yellowSignal = normalizeContrast((cYellow - aYellow) * 1.55f + localLumaContrast * 0.30f)
-            val infraredSignal = normalizeContrast(localLumaContrast * 1.80f)
+            // Señal real 0..255, sin sumar 128. Esto hace visibles los valores bajos reales.
+            val localLumaContrast = (cLuma - aLuma).coerceAtLeast(0f)
+            val redSignal = ((cRed - aRed) * 1.20f + localLumaContrast * 0.15f).coerceIn(0f, 255f)
+            val yellowSignal = ((cYellow - aYellow) * 1.20f + localLumaContrast * 0.15f).coerceIn(0f, 255f)
+            val infraredSignal = (localLumaContrast * 1.35f).coerceIn(0f, 255f)
 
             onSample(
                 LedFrameSample(
@@ -138,8 +131,29 @@ class LedFrameAnalyzer(
         return Rgb(r, g, b)
     }
 
-    private fun normalizeContrast(contrast: Float): Float =
-        (128f + contrast).coerceIn(0f, 255f)
+    private class TopAverage(private val size: Int) {
+        private val values = FloatArray(size)
+        var count: Int = 0
+            private set
+
+        fun add(value: Float) {
+            if (count < size) {
+                values[count++] = value
+                if (count == size) values.sort()
+                return
+            }
+            if (value <= values[0]) return
+            values[0] = value
+            values.sort()
+        }
+
+        fun average(): Float {
+            if (count == 0) return 0f
+            var sum = 0f
+            for (i in 0 until count) sum += values[i]
+            return sum / count
+        }
+    }
 
     private data class Rgb(val r: Float, val g: Float, val b: Float)
 }
