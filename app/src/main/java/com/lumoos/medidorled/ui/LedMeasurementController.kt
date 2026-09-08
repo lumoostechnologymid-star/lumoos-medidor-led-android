@@ -13,7 +13,7 @@ enum class LedColorMode {
 }
 
 class LedMeasurementController {
-    private var engine = LedMeasurementEngine(threshold = 128f, hysteresis = 2f)
+    private var engine = LedMeasurementEngine(threshold = 20f, hysteresis = 2f)
 
     var state by mutableStateOf(MeasurementUiState())
         private set
@@ -34,13 +34,13 @@ class LedMeasurementController {
 
     fun setLedColorMode(mode: LedColorMode) {
         if (state.locked || state.calibrating || state.ledColorMode == mode) return
-        engine = LedMeasurementEngine(threshold = 128f, hysteresis = 2f)
+        engine = LedMeasurementEngine(threshold = 20f, hysteresis = 2f)
         calibrationStartNs = null
         state = state.copy(
             ledColorMode = mode,
-            threshold = 128f,
+            threshold = 20f,
             hysteresis = 2f,
-            signal = 128f,
+            signal = 0f,
             ledKnown = false,
             ledOn = false,
             revolutions = 0,
@@ -49,8 +49,8 @@ class LedMeasurementController {
             resultKw = null,
             status = "Listo para medir",
             message = when (mode) {
-                LedColorMode.YELLOW -> "Modo amarillo activado · filtro solar activo"
-                LedColorMode.RED -> "Modo rojo activado · filtro solar activo"
+                LedColorMode.YELLOW -> "Modo amarillo activado · optimizado para destellos cortos"
+                LedColorMode.RED -> "Modo rojo activado · optimizado para destellos cortos"
                 LedColorMode.INFRARED -> "Modo infrarrojo activado · se detectará contraste de brillo"
             }
         )
@@ -86,7 +86,7 @@ class LedMeasurementController {
         state = state.copy(
             calibrating = true,
             calibrationProgress = 0f,
-            message = "Mantén el LED dentro del recuadro y deja que prenda/apague durante 3 segundos"
+            message = "Mantén el LED dentro del recuadro y deja que parpadee durante 3 segundos"
         )
     }
 
@@ -162,10 +162,10 @@ class LedMeasurementController {
 data class MeasurementUiState(
     val khText: String = "1.0",
     val targetRevolutions: Int = 5,
-    val threshold: Float = 128f,
+    val threshold: Float = 20f,
     val hysteresis: Float = 2f,
     val brightness: Float = 0f,
-    val signal: Float = 128f,
+    val signal: Float = 0f,
     val ledColorMode: LedColorMode = LedColorMode.YELLOW,
     val ledOn: Boolean = false,
     val ledKnown: Boolean = false,
