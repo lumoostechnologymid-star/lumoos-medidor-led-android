@@ -13,7 +13,7 @@ enum class LedColorMode {
 }
 
 class LedMeasurementController {
-    private var engine = LedMeasurementEngine(threshold = 140f, hysteresis = 8f)
+    private var engine = LedMeasurementEngine(threshold = 128f, hysteresis = 2f)
 
     var state by mutableStateOf(MeasurementUiState())
         private set
@@ -34,11 +34,12 @@ class LedMeasurementController {
 
     fun setLedColorMode(mode: LedColorMode) {
         if (state.locked || state.calibrating || state.ledColorMode == mode) return
-        engine = LedMeasurementEngine(threshold = 140f, hysteresis = 8f)
+        engine = LedMeasurementEngine(threshold = 128f, hysteresis = 2f)
         calibrationStartNs = null
         state = state.copy(
             ledColorMode = mode,
-            threshold = 140f,
+            threshold = 128f,
+            hysteresis = 2f,
             signal = 128f,
             ledKnown = false,
             ledOn = false,
@@ -110,24 +111,25 @@ class LedMeasurementController {
 
             if (elapsed >= 3f) {
                 val range = calibrationMax - calibrationMin
-                if (range >= 10f) {
+                if (range >= 2f) {
                     val threshold = (calibrationMin + calibrationMax) / 2f
-                    val hysteresis = (range * 0.12f).coerceIn(5f, 18f)
+                    val hysteresis = (range * 0.15f).coerceIn(0.5f, 8f)
                     engine.setSensitivity(threshold, hysteresis)
                     next = next.copy(
                         calibrating = false,
                         threshold = threshold,
+                        hysteresis = hysteresis,
                         calibrationProgress = 1f,
-                        message = "Calibración lista · señal ${calibrationMin.toInt()}–${calibrationMax.toInt()} · umbral ${threshold.toInt()}"
+                        message = "Calibración lista · apagado ${calibrationMin.format1()} · encendido ${calibrationMax.format1()} · umbral ${threshold.format1()}"
                     )
                 } else {
                     next = next.copy(
                         calibrating = false,
                         calibrationProgress = 0f,
                         message = if (next.ledColorMode == LedColorMode.INFRARED) {
-                            "No detecté suficiente contraste infrarrojo. Acerca la cámara; algunos teléfonos filtran la luz IR."
+                            "El cambio detectado fue muy pequeño. Acerca la cámara; algunos teléfonos filtran la luz IR."
                         } else {
-                            "No detecté suficiente cambio del LED. Centra mejor el recuadro y vuelve a calibrar."
+                            "El cambio detectado fue muy pequeño. Centra mejor el LED y vuelve a calibrar."
                         }
                     )
                 }
@@ -151,6 +153,7 @@ class LedMeasurementController {
             resultKw = snapshot.resultKw,
             status = snapshot.status,
             threshold = snapshot.threshold,
+            hysteresis = snapshot.hysteresis,
             message = if (preserveMessage) state.message else null
         )
     }
@@ -159,7 +162,8 @@ class LedMeasurementController {
 data class MeasurementUiState(
     val khText: String = "1.0",
     val targetRevolutions: Int = 5,
-    val threshold: Float = 140f,
+    val threshold: Float = 128f,
+    val hysteresis: Float = 2f,
     val brightness: Float = 0f,
     val signal: Float = 128f,
     val ledColorMode: LedColorMode = LedColorMode.YELLOW,
@@ -177,4 +181,8 @@ data class MeasurementUiState(
     val message: String? = null
 ) {
     val locked: Boolean get() = armed || measuring
+    val onThreshold: Float get() = (threshold + hysteresis).coerceAtMost(255f)
+    val offThreshold: Float get() = (threshold - hysteresis).coerceAtLeast(0f)
 }
+
+private fun Float.format1(): String = String.format(java.util.Locale.US, "%.1f", this)
