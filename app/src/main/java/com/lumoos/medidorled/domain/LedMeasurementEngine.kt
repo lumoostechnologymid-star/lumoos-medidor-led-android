@@ -10,8 +10,8 @@ import kotlin.math.max
  * Every following OFF -> ON edge completes one revolution.
  */
 class LedMeasurementEngine(
-    threshold: Float = 140f,
-    hysteresis: Float = 10f,
+    threshold: Float = 128f,
+    hysteresis: Float = 2f,
     private val debounceNs: Long = 60_000_000L
 ) {
     var threshold: Float = threshold
@@ -37,8 +37,8 @@ class LedMeasurementEngine(
     private var status = "Listo para medir"
 
     fun setSensitivity(newThreshold: Float, newHysteresis: Float = hysteresis) {
-        threshold = newThreshold.coerceIn(1f, 254f)
-        hysteresis = newHysteresis.coerceIn(1f, 40f)
+        threshold = newThreshold.coerceIn(0f, 255f)
+        hysteresis = newHysteresis.coerceIn(0.2f, 40f)
     }
 
     fun arm(targetRevolutions: Int, kh: Double): Snapshot {
