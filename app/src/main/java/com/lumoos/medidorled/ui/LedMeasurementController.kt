@@ -9,7 +9,8 @@ import com.lumoos.medidorled.domain.LedMeasurementEngine
 enum class LedColorMode {
     YELLOW,
     RED,
-    INFRARED
+    INFRARED,
+    DISPLAY
 }
 
 class LedMeasurementController {
@@ -52,6 +53,7 @@ class LedMeasurementController {
                 LedColorMode.YELLOW -> "Modo amarillo activado · optimizado para destellos cortos"
                 LedColorMode.RED -> "Modo rojo activado · optimizado para destellos cortos"
                 LedColorMode.INFRARED -> "Modo infrarrojo activado · se detectará contraste de brillo"
+                LedColorMode.DISPLAY -> "Centra solo el cuadrado superior. Visible → ausente → visible = una vuelta. Calibra antes de medir."
             }
         )
     }
@@ -86,7 +88,7 @@ class LedMeasurementController {
         state = state.copy(
             calibrating = true,
             calibrationProgress = 0f,
-            message = "Mantén el LED dentro del recuadro y deja que parpadee durante 3 segundos"
+            message = if (state.isDisplay) "Mantén el cuadrado centrado y deja que aparezca y desaparezca durante 3 segundos" else "Mantén el LED dentro del recuadro y deja que parpadee durante 3 segundos"
         )
     }
 
@@ -95,6 +97,7 @@ class LedMeasurementController {
             LedColorMode.YELLOW -> sample.yellowSignal
             LedColorMode.RED -> sample.redSignal
             LedColorMode.INFRARED -> sample.infraredSignal
+            LedColorMode.DISPLAY -> sample.displaySignal
         }
 
         var next = state.copy(
@@ -129,7 +132,7 @@ class LedMeasurementController {
                         message = if (next.ledColorMode == LedColorMode.INFRARED) {
                             "El cambio detectado fue muy pequeño. Acerca la cámara; algunos teléfonos filtran la luz IR."
                         } else {
-                            "El cambio detectado fue muy pequeño. Centra mejor el LED y vuelve a calibrar."
+                            if (next.isDisplay) "No se distinguieron ambos estados. Centra solo el cuadrado superior y repite cuando aparezca y desaparezca." else "El cambio detectado fue muy pequeño. Centra mejor el LED y vuelve a calibrar."
                         }
                     )
                 }
@@ -151,7 +154,10 @@ class LedMeasurementController {
             elapsedSeconds = snapshot.elapsedSeconds,
             lastRevolutionSeconds = snapshot.lastRevolutionSeconds,
             resultKw = snapshot.resultKw,
-            status = snapshot.status,
+            status = if (state.isDisplay) snapshot.status
+                .replace("el LED se apague", "el cuadrado desaparezca")
+                .replace("LED apagado", "Cuadrado ausente")
+                .replace("encendido", "aparición") else snapshot.status,
             threshold = snapshot.threshold,
             hysteresis = snapshot.hysteresis,
             message = if (preserveMessage) state.message else null
@@ -180,9 +186,11 @@ data class MeasurementUiState(
     val calibrationProgress: Float = 0f,
     val message: String? = null
 ) {
+    val isDisplay: Boolean get() = ledColorMode == LedColorMode.DISPLAY
     val locked: Boolean get() = armed || measuring
     val onThreshold: Float get() = (threshold + hysteresis).coerceAtMost(255f)
     val offThreshold: Float get() = (threshold - hysteresis).coerceAtLeast(0f)
 }
 
 private fun Float.format1(): String = String.format(java.util.Locale.US, "%.1f", this)
+

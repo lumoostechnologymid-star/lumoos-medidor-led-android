@@ -43,6 +43,8 @@ class LedFrameAnalyzer(
             val topRed = TopAverage(16)
             val topYellow = TopAverage(16)
 
+            var centerLumaSum = 0.0
+            var centerCount = 0
             var ambientLuma = 0.0
             var ambientRed = 0.0
             var ambientYellow = 0.0
@@ -69,6 +71,8 @@ class LedFrameAnalyzer(
                         val isCenter = x in centerLeft until centerRight && y in centerTop until centerBottom
 
                         if (isCenter) {
+                            centerLumaSum += yValue
+                            centerCount++
                             topLuma.add(yValue.toFloat())
                             topRed.add(redScore)
                             topYellow.add(yellowScore)
@@ -106,7 +110,10 @@ class LedFrameAnalyzer(
                     redSignal = redSignal,
                     yellowSignal = yellowSignal,
                     infraredSignal = infraredSignal,
-                    timestampNs = image.imageInfo.timestamp
+                    timestampNs = image.imageInfo.timestamp,
+                    displaySignal = DisplayContrast.signal(
+                        (centerLumaSum / centerCount).toFloat(), aLuma
+                    )
                 )
             )
         } finally {
@@ -163,5 +170,7 @@ data class LedFrameSample(
     val redSignal: Float,
     val yellowSignal: Float,
     val infraredSignal: Float,
-    val timestampNs: Long
+    val timestampNs: Long,
+    val displaySignal: Float = 0f
 )
+

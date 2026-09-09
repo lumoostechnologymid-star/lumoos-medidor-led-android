@@ -152,24 +152,24 @@ private fun LedStatusCard(state: MeasurementUiState) {
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
-            Text("Estado del LED", fontWeight = FontWeight.SemiBold)
+            Text(if (state.isDisplay) "Estado del cuadro" else "Estado del LED", fontWeight = FontWeight.SemiBold)
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween
             ) {
-                Text("Estado LED")
+                Text(if (state.isDisplay) "Cuadro del display" else "Estado LED")
                 Text(
                     when {
                         !state.ledKnown -> "Detectando…"
-                        state.ledOn -> "● PRENDIDO"
-                        else -> "○ APAGADO"
+                        state.ledOn -> if (state.isDisplay) "■ VISIBLE" else "● PRENDIDO"
+                        else -> if (state.isDisplay) "□ AUSENTE" else "○ APAGADO"
                     },
                     fontWeight = FontWeight.Bold
                 )
             }
             MetricRow("Señal actual", String.format(Locale.US, "%.1f", state.signal))
-            MetricRow("ENCENDIDO desde", String.format(Locale.US, "%.1f", state.onThreshold))
-            MetricRow("APAGADO debajo de", String.format(Locale.US, "%.1f", state.offThreshold))
+            MetricRow(if (state.isDisplay) "VISIBLE desde" else "ENCENDIDO desde", String.format(Locale.US, "%.1f", state.onThreshold))
+            MetricRow(if (state.isDisplay) "AUSENTE debajo de" else "APAGADO debajo de", String.format(Locale.US, "%.1f", state.offThreshold))
             MetricRow("Vueltas", "${state.revolutions} / ${state.targetRevolutions}")
             MetricRow("Tiempo total", formatSeconds(state.elapsedSeconds))
             MetricRow("Última vuelta", formatSeconds(state.lastRevolutionSeconds))
@@ -224,7 +224,16 @@ private fun MeasurementSettingsCard(
                 }
             }
 
-            Text("Color / tipo del LED")
+            Text("Tipo de detección")
+            FilterChip(
+                selected = state.isDisplay,
+                onClick = { controller.setLedColorMode(LedColorMode.DISPLAY) },
+                enabled = !state.locked && !state.calibrating,
+                label = { Text("Cuadro del display") }
+            )
+            if (state.isDisplay) {
+                Text("Centra únicamente el cuadrado superior; deja fuera el inferior y las flechas. Aparece → desaparece → aparece = una vuelta. Si ya está visible al iniciar, se espera su siguiente aparición.")
+            }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
                     selected = state.ledColorMode == LedColorMode.YELLOW,
@@ -259,12 +268,12 @@ private fun DetectionCard(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text("Detección del LED", fontWeight = FontWeight.SemiBold)
-            Text("Filtro solar: ACTIVO · compara el centro con la luz alrededor")
+            Text(if (state.isDisplay) "Detección del cuadro" else "Detección del LED", fontWeight = FontWeight.SemiBold)
+            Text(if (state.isDisplay) "Detecta el centro oscuro sobre el fondo claro del display" else "Filtro solar: ACTIVO · compara el centro con la luz alrededor")
             MetricRow("Brillo del centro", String.format(Locale.US, "%.1f", state.brightness))
             MetricRow("Señal actual", String.format(Locale.US, "%.1f", state.signal))
-            MetricRow("ENCENDIDO desde", String.format(Locale.US, "%.1f", state.onThreshold))
-            MetricRow("APAGADO debajo de", String.format(Locale.US, "%.1f", state.offThreshold))
+            MetricRow(if (state.isDisplay) "VISIBLE desde" else "ENCENDIDO desde", String.format(Locale.US, "%.1f", state.onThreshold))
+            MetricRow(if (state.isDisplay) "AUSENTE debajo de" else "APAGADO debajo de", String.format(Locale.US, "%.1f", state.offThreshold))
 
             LinearProgressIndicator(
                 progress = { (state.signal / 255f).coerceIn(0f, 1f) },
@@ -328,7 +337,7 @@ private fun MeasurementBottomControls(
                 Text(
                     when {
                         state.measuring -> "Medición en curso"
-                        state.armed -> "Esperando pulso del LED"
+                        state.armed -> if (state.isDisplay) "Esperando aparición del cuadro" else "Esperando pulso del LED"
                         else -> "▶  Iniciar medición"
                     },
                     fontWeight = FontWeight.Bold
@@ -389,3 +398,4 @@ private fun MetricRow(label: String, value: String) {
 
 private fun formatSeconds(seconds: Double): String =
     String.format(Locale.US, "%.3f s", seconds)
+
