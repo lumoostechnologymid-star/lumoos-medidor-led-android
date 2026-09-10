@@ -93,6 +93,8 @@ class LedMeasurementController {
     }
 
     fun onFrame(sample: LedFrameSample) {
+        // Ignore a queued frame from the previous detection mode.
+        if (sample.sampledForDisplay != state.isDisplay) return
         val selectedSignal = when (state.ledColorMode) {
             LedColorMode.YELLOW -> sample.yellowSignal
             LedColorMode.RED -> sample.redSignal

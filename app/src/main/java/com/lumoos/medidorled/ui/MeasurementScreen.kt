@@ -31,6 +31,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -68,11 +69,13 @@ fun MeasurementScreen(controller: LedMeasurementController) {
         if (!cameraGranted) permissionLauncher.launch(Manifest.permission.CAMERA)
     }
 
-    val analyzer: ImageAnalysis.Analyzer = remember(controller) {
+    val analyzer = remember(controller) {
         LedFrameAnalyzer { sample ->
             mainExecutor.execute { controller.onFrame(sample) }
         }
     }
+
+    SideEffect { analyzer.displayMode = state.isDisplay }
 
     Scaffold(
         topBar = { TopAppBar(title = { Text("Lumoos Medidor LED") }) },
@@ -100,7 +103,7 @@ fun MeasurementScreen(controller: LedMeasurementController) {
                         .padding(horizontal = 12.dp, vertical = 8.dp)
                 ) {
                     Box(modifier = Modifier.height(270.dp)) {
-                        CameraPreview(analyzer = analyzer, modifier = Modifier.fillMaxSize())
+                        CameraPreview(analyzer = analyzer, displayMode = state.isDisplay, modifier = Modifier.fillMaxSize())
                     }
                 }
             } else {
@@ -232,7 +235,7 @@ private fun MeasurementSettingsCard(
                 label = { Text("Cuadro del display") }
             )
             if (state.isDisplay) {
-                Text("Centra únicamente el cuadrado superior; deja fuera el inferior y las flechas. Aparece → desaparece → aparece = una vuelta. Si ya está visible al iniciar, se espera su siguiente aparición.")
+                Text("Recuadro pequeño para display: centra únicamente el cuadrado superior; deja fuera el inferior y las flechas. Aparece → desaparece → aparece = una vuelta. Si ya está visible al iniciar, se espera su siguiente aparición.")
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
