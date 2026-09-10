@@ -1,7 +1,7 @@
 name: Build iPhone app
 on:
   push:
-    branches: [main]
+    branches: [main, 'ios/**']
     paths: ['ios/**', '.github/workflows/build-ios.yml']
   workflow_dispatch:
 permissions:
