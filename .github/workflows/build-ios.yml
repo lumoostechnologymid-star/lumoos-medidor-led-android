@@ -1,0 +1,44 @@
+name: Build iPhone app
+on:
+  push:
+    branches: [main]
+    paths: ['ios/**', '.github/workflows/build-ios.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: macos-15
+    steps:
+      - uses: actions/checkout@v5
+      - name: Test measurement and image analysis
+        working-directory: ios
+        run: swift test
+      - name: Install XcodeGen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: ios
+        run: xcodegen generate
+      - name: Build for iPhone simulator
+        working-directory: ios
+        run: xcodebuild -project LumoosMedidor.xcodeproj -scheme LumoosMedidor -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' -derivedDataPath build-simulator CODE_SIGNING_ALLOWED=NO build
+      - name: Build for iPhone without signing
+        working-directory: ios
+        run: xcodebuild -project LumoosMedidor.xcodeproj -scheme LumoosMedidor -sdk iphoneos -destination 'generic/platform=iOS' -derivedDataPath build-device CODE_SIGNING_ALLOWED=NO build
+      - name: Upload simulator build
+        uses: actions/upload-artifact@v4
+        with:
+          name: LumoosMedidor-iOS-simulator
+          path: ios/build-simulator/Build/Products/Debug-iphonesimulator/LumoosMedidor.app
+      - name: Upload Xcode project
+        uses: actions/upload-artifact@v4
+        with:
+          name: LumoosMedidor-iOS-source
+          path: |
+            ios/App
+            ios/Sources
+            ios/Tests
+            ios/Package.swift
+            ios/project.yml
+            ios/README.md
+            ios/LumoosMedidor.xcodeproj
