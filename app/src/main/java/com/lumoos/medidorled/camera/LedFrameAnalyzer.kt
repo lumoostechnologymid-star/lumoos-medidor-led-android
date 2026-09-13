@@ -16,11 +16,31 @@ class LedFrameAnalyzer(
     private val onSample: (LedFrameSample) -> Unit
 ) : ImageAnalysis.Analyzer {
 
+    @Volatile var displayMode: Boolean = false
+
     override fun analyze(image: ImageProxy) {
         try {
             val yPlane = image.planes.firstOrNull() ?: return
             val uPlane = image.planes.getOrNull(1)
             val vPlane = image.planes.getOrNull(2)
+            // Capture the mode once, so one frame cannot mix two ROI sizes.
+            val forDisplay = displayMode
+            if (forDisplay) {
+                val crop = image.cropRect
+                if (crop.width() < 8 || crop.height() < 8) return
+                val regions = DisplayRegion.regions(crop.left, crop.top, crop.right, crop.bottom)
+                val reading = DisplayRegion.measure(regions) { x, y -> readPlaneValue(yPlane, x, y) } ?: return
+                onSample(LedFrameSample(
+                    centerLuma = reading.centerLuma,
+                    redSignal = 0f,
+                    yellowSignal = 0f,
+                    infraredSignal = 0f,
+                    timestampNs = image.imageInfo.timestamp,
+                    displaySignal = reading.signal,
+                    sampledForDisplay = true
+                ))
+                return
+            }
             val width = image.width
             val height = image.height
 
@@ -171,6 +191,7 @@ data class LedFrameSample(
     val yellowSignal: Float,
     val infraredSignal: Float,
     val timestampNs: Long,
-    val displaySignal: Float = 0f
+    val displaySignal: Float = 0f,
+    val sampledForDisplay: Boolean = false
 )
 
