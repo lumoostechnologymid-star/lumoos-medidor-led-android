@@ -31,6 +31,7 @@ import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -84,8 +85,7 @@ fun MeasurementScreen(controller: LedMeasurementController) {
                 state = state,
                 cameraGranted = cameraGranted,
                 onStart = controller::armMeasurement,
-                onReset = controller::reset,
-                onCalibrate = controller::startCalibration
+                onReset = controller::reset
             )
         }
     ) { padding ->
@@ -132,7 +132,7 @@ fun MeasurementScreen(controller: LedMeasurementController) {
             ) {
                 LedStatusCard(state)
                 MeasurementSettingsCard(state, controller)
-                DetectionCard(state, controller)
+                DetectionCard(state, controller, cameraGranted)
 
                 state.resultKw?.let { result ->
                     ResultCard(state = state, result = result)
@@ -264,52 +264,87 @@ private fun MeasurementSettingsCard(
 @Composable
 private fun DetectionCard(
     state: MeasurementUiState,
-    controller: LedMeasurementController
+    controller: LedMeasurementController,
+    cameraGranted: Boolean
 ) {
+    var expanded by rememberSaveable { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth()) {
         Column(
             modifier = Modifier.padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Text(if (state.isDisplay) "Detección del cuadro" else "Detección del LED", fontWeight = FontWeight.SemiBold)
-            Text(if (state.isDisplay) "Detecta el centro oscuro sobre el fondo claro del display" else "Filtro solar: ACTIVO · compara el centro con la luz alrededor")
-            MetricRow("Brillo del centro", String.format(Locale.US, "%.1f", state.brightness))
-            MetricRow("Señal actual", String.format(Locale.US, "%.1f", state.signal))
-            MetricRow(if (state.isDisplay) "VISIBLE desde" else "ENCENDIDO desde", String.format(Locale.US, "%.1f", state.onThreshold))
-            MetricRow(if (state.isDisplay) "AUSENTE debajo de" else "APAGADO debajo de", String.format(Locale.US, "%.1f", state.offThreshold))
-
-            LinearProgressIndicator(
-                progress = { (state.signal / 255f).coerceIn(0f, 1f) },
+            OutlinedButton(
+                onClick = { expanded = !expanded },
                 modifier = Modifier.fillMaxWidth()
-            )
-
-            Text("Umbral central: ${String.format(Locale.US, "%.1f", state.threshold)}")
-            Slider(
-                value = state.threshold,
-                onValueChange = controller::setThreshold,
-                valueRange = 0f..255f,
-                steps = 254,
-                enabled = !state.locked && !state.calibrating
-            )
-
-            if (state.calibrating) {
+            ) {
+                Column(modifier = Modifier.fillMaxWidth()) {
+                    Text(
+                        if (state.isDisplay) "Detección del cuadro" else "Detección del LED",
+                        fontWeight = FontWeight.SemiBold
+                    )
+                    Text(
+                        if (expanded) "Ocultar ajustes ▴" else "Mostrar ajustes y calibración ▾",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+            }
+            if (state.calibrating && !expanded) {
+                Text("Calibrando…", style = MaterialTheme.typography.bodySmall)
                 LinearProgressIndicator(
                     progress = { state.calibrationProgress },
                     modifier = Modifier.fillMaxWidth()
                 )
-                Text("Calibrando…", style = MaterialTheme.typography.bodySmall)
             }
-
-            Text(
-                "Ajusta el umbral entre la señal apagada y la señal prendida. La calibración automática también puede hacerlo por ti.",
-                style = MaterialTheme.typography.bodySmall
-            )
-
-            if (state.ledColorMode == LedColorMode.INFRARED) {
-                Text(
-                    "Nota: algunos teléfonos tienen un filtro físico que reduce la luz infrarroja; si la señal casi no cambia, prueba acercando la cámara.",
-                    style = MaterialTheme.typography.bodySmall
-                )
+            if (expanded) {
+                Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    OutlinedButton(
+                        onClick = controller::startCalibration,
+                        enabled = cameraGranted && !state.locked && !state.calibrating,
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Text(if (state.calibrating) "Calibrando…" else "Calibrar (3 s)")
+                    }
+                    Text(if (state.isDisplay) "Detecta el centro oscuro sobre el fondo claro del display" else "Filtro solar: ACTIVO · compara el centro con la luz alrededor")
+                    MetricRow("Brillo del centro", String.format(Locale.US, "%.1f", state.brightness))
+                    MetricRow("Señal actual", String.format(Locale.US, "%.1f", state.signal))
+                    MetricRow(if (state.isDisplay) "VISIBLE desde" else "ENCENDIDO desde", String.format(Locale.US, "%.1f", state.onThreshold))
+                    MetricRow(if (state.isDisplay) "AUSENTE debajo de" else "APAGADO debajo de", String.format(Locale.US, "%.1f", state.offThreshold))
+        
+                    LinearProgressIndicator(
+                        progress = { (state.signal / 255f).coerceIn(0f, 1f) },
+                        modifier = Modifier.fillMaxWidth()
+                    )
+        
+                    Text("Umbral central: ${String.format(Locale.US, "%.1f", state.threshold)}")
+                    Slider(
+                        value = state.threshold,
+                        onValueChange = controller::setThreshold,
+                        valueRange = 0f..255f,
+                        steps = 254,
+                        enabled = !state.locked && !state.calibrating
+                    )
+        
+                    if (state.calibrating) {
+                        LinearProgressIndicator(
+                            progress = { state.calibrationProgress },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                        Text("Calibrando…", style = MaterialTheme.typography.bodySmall)
+                    }
+        
+                    Text(
+                        "Ajusta el umbral entre la señal apagada y la señal prendida. La calibración automática también puede hacerlo por ti.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+        
+                    if (state.ledColorMode == LedColorMode.INFRARED) {
+                        Text(
+                            "Nota: algunos teléfonos tienen un filtro físico que reduce la luz infrarroja; si la señal casi no cambia, prueba acercando la cámara.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
+        
+                }
             }
         }
     }
@@ -320,8 +355,7 @@ private fun MeasurementBottomControls(
     state: MeasurementUiState,
     cameraGranted: Boolean,
     onStart: () -> Unit,
-    onReset: () -> Unit,
-    onCalibrate: () -> Unit
+    onReset: () -> Unit
 ) {
     Surface(tonalElevation = 4.dp) {
         Column(
@@ -356,13 +390,6 @@ private fun MeasurementBottomControls(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Reiniciar")
-                }
-                OutlinedButton(
-                    onClick = onCalibrate,
-                    enabled = !state.locked && !state.calibrating,
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text(if (state.calibrating) "Calibrando…" else "Calibrar")
                 }
             }
         }
