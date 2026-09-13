@@ -327,7 +327,7 @@ private fun MeasurementBottomControls(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 12.dp, vertical = 10.dp),
+                .padding(start = 12.dp, end = 12.dp, top = 10.dp, bottom = 42.dp),
             verticalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             Button(
