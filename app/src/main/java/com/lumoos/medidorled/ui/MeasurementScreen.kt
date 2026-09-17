@@ -242,7 +242,7 @@ private fun MeasurementSettingsCard(
                     selected = state.ledColorMode == LedColorMode.YELLOW,
                     onClick = { controller.setLedColorMode(LedColorMode.YELLOW) },
                     enabled = !state.locked && !state.calibrating,
-                    label = { Text("Amarillo") }
+                    label = { Text("Amarillo / verde") }
                 )
                 FilterChip(
                     selected = state.ledColorMode == LedColorMode.RED,

@@ -87,7 +87,7 @@ class LedFrameAnalyzer(
                         }
 
                         val redScore = (rgb.r - max(rgb.g, rgb.b) * 0.90f).coerceAtLeast(0f)
-                        val yellowScore = (min(rgb.r, rgb.g) - rgb.b * 0.75f).coerceAtLeast(0f)
+                        val yellowScore = LedColorSignal.yellowGreen(rgb.r, rgb.g, rgb.b)
                         val isCenter = x in centerLeft until centerRight && y in centerTop until centerBottom
 
                         if (isCenter) {

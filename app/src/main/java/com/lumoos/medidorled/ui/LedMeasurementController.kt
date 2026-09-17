@@ -50,7 +50,7 @@ class LedMeasurementController {
             resultKw = null,
             status = "Listo para medir",
             message = when (mode) {
-                LedColorMode.YELLOW -> "Modo amarillo activado · optimizado para destellos cortos"
+                LedColorMode.YELLOW -> "Modo amarillo / verde · filtro de luz blanca activado"
                 LedColorMode.RED -> "Modo rojo activado · optimizado para destellos cortos"
                 LedColorMode.INFRARED -> "Modo infrarrojo activado · se detectará contraste de brillo"
                 LedColorMode.DISPLAY -> "Centra solo el cuadrado superior. Visible → ausente → visible = una vuelta. Calibra antes de medir."
@@ -88,7 +88,7 @@ class LedMeasurementController {
         state = state.copy(
             calibrating = true,
             calibrationProgress = 0f,
-            message = if (state.isDisplay) "Mantén el cuadrado centrado y deja que aparezca y desaparezca durante 3 segundos" else "Mantén el LED dentro del recuadro y deja que parpadee durante 3 segundos"
+            message = if (state.isDisplay) "Mantén el cuadrado centrado y deja que aparezca y desaparezca durante 3 segundos" else "Mantén el LED centrado y el teléfono quieto durante 8 segundos; debe encenderse y apagarse"
         )
     }
 
@@ -112,9 +112,10 @@ class LedMeasurementController {
             calibrationMin = minOf(calibrationMin, selectedSignal)
             calibrationMax = maxOf(calibrationMax, selectedSignal)
             val elapsed = (sample.timestampNs - start) / 1_000_000_000f
-            next = next.copy(calibrationProgress = (elapsed / 3f).coerceIn(0f, 1f))
+            val calibrationSeconds = if (next.isDisplay) 3f else 8f
+            next = next.copy(calibrationProgress = (elapsed / calibrationSeconds).coerceIn(0f, 1f))
 
-            if (elapsed >= 3f) {
+            if (elapsed >= calibrationSeconds) {
                 val range = calibrationMax - calibrationMin
                 if (range >= 2f) {
                     val threshold = (calibrationMin + calibrationMax) / 2f
