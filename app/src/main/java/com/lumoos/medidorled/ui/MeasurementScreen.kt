@@ -289,7 +289,7 @@ private fun DetectionCard(
                 }
             }
             if (state.calibrating && !expanded) {
-                Text("Calibrando…", style = MaterialTheme.typography.bodySmall)
+                Text("Calibrando ${state.calibrationSeconds} s · ${(state.calibrationProgress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
                 LinearProgressIndicator(
                     progress = { state.calibrationProgress },
                     modifier = Modifier.fillMaxWidth()
@@ -297,12 +297,23 @@ private fun DetectionCard(
             }
             if (expanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Text("Tiempo de calibración")
+                    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        listOf(3, 5, 10, 15).forEach { seconds ->
+                            FilterChip(
+                                selected = state.calibrationSeconds == seconds,
+                                onClick = { controller.setCalibrationSeconds(seconds) },
+                                enabled = !state.locked && !state.calibrating,
+                                label = { Text("$seconds s") }
+                            )
+                        }
+                    }
                     OutlinedButton(
                         onClick = controller::startCalibration,
                         enabled = cameraGranted && !state.locked && !state.calibrating,
                         modifier = Modifier.fillMaxWidth()
                     ) {
-                        Text(if (state.calibrating) "Calibrando…" else "Calibrar (3 s)")
+                        Text(if (state.calibrating) "Calibrando…" else "Calibrar (${state.calibrationSeconds} s)")
                     }
                     Text(if (state.isDisplay) "Detecta el centro oscuro sobre el fondo claro del display" else "Filtro solar: ACTIVO · compara el centro con la luz alrededor")
                     MetricRow("Brillo del centro", String.format(Locale.US, "%.1f", state.brightness))
@@ -329,7 +340,7 @@ private fun DetectionCard(
                             progress = { state.calibrationProgress },
                             modifier = Modifier.fillMaxWidth()
                         )
-                        Text("Calibrando…", style = MaterialTheme.typography.bodySmall)
+                        Text("Calibrando ${state.calibrationSeconds} s · ${(state.calibrationProgress * 100).toInt()}%", style = MaterialTheme.typography.bodySmall)
                     }
         
                     Text(

@@ -77,18 +77,24 @@ class LedMeasurementController {
 
     fun reset() {
         apply(engine.reset())
-        state = state.copy(message = null)
+        calibrationStartNs = null
+        state = state.copy(message = null, calibrating = false, calibrationProgress = 0f)
+    }
+
+    fun setCalibrationSeconds(seconds: Int) {
+        if (state.locked || state.calibrating || seconds !in listOf(3, 5, 10, 15)) return
+        state = state.copy(calibrationSeconds = seconds)
     }
 
     fun startCalibration() {
-        if (state.locked) return
+        if (state.locked || state.calibrating) return
         calibrationStartNs = null
         calibrationMin = 255f
         calibrationMax = 0f
         state = state.copy(
             calibrating = true,
             calibrationProgress = 0f,
-            message = if (state.isDisplay) "Mantén el cuadrado centrado y deja que aparezca y desaparezca durante 3 segundos" else "Mantén el LED centrado y el teléfono quieto durante 8 segundos; debe encenderse y apagarse"
+            message = if (state.isDisplay) "Mantén el cuadrado centrado y deja que aparezca y desaparezca durante ${state.calibrationSeconds} segundos" else "Mantén el LED centrado y el teléfono quieto durante ${state.calibrationSeconds} segundos; debe encenderse y apagarse"
         )
     }
 
@@ -112,7 +118,7 @@ class LedMeasurementController {
             calibrationMin = minOf(calibrationMin, selectedSignal)
             calibrationMax = maxOf(calibrationMax, selectedSignal)
             val elapsed = (sample.timestampNs - start) / 1_000_000_000f
-            val calibrationSeconds = if (next.isDisplay) 3f else 8f
+            val calibrationSeconds = next.calibrationSeconds.toFloat()
             next = next.copy(calibrationProgress = (elapsed / calibrationSeconds).coerceIn(0f, 1f))
 
             if (elapsed >= calibrationSeconds) {
@@ -185,6 +191,7 @@ data class MeasurementUiState(
     val lastRevolutionSeconds: Double = 0.0,
     val resultKw: Double? = null,
     val status: String = "Listo para medir",
+    val calibrationSeconds: Int = 3,
     val calibrating: Boolean = false,
     val calibrationProgress: Float = 0f,
     val message: String? = null
