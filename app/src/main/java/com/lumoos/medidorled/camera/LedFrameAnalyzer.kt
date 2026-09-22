@@ -3,7 +3,6 @@ package com.lumoos.medidorled.camera
 import androidx.camera.core.ImageAnalysis
 import androidx.camera.core.ImageProxy
 import kotlin.math.max
-import kotlin.math.min
 
 /**
  * Analiza una zona pequeña al centro y la compara con un anillo alrededor.
@@ -11,8 +10,6 @@ import kotlin.math.min
  * más intensos, evitando que el destello se diluya dentro del recuadro.
  */
 class LedFrameAnalyzer(
-    private val centerFraction: Float = 0.10f,
-    private val ambientFraction: Float = 0.28f,
     private val onSample: (LedFrameSample) -> Unit
 ) : ImageAnalysis.Analyzer {
 
@@ -41,23 +38,18 @@ class LedFrameAnalyzer(
                 ))
                 return
             }
-            val width = image.width
-            val height = image.height
-
-            val centerWidth = (width * centerFraction).toInt().coerceAtLeast(8)
-            val centerHeight = (height * centerFraction).toInt().coerceAtLeast(8)
-            val outerWidth = (width * ambientFraction).toInt().coerceAtLeast(centerWidth + 8)
-            val outerHeight = (height * ambientFraction).toInt().coerceAtLeast(centerHeight + 8)
-
-            val centerLeft = ((width - centerWidth) / 2).coerceAtLeast(0)
-            val centerTop = ((height - centerHeight) / 2).coerceAtLeast(0)
-            val centerRight = (centerLeft + centerWidth).coerceAtMost(width)
-            val centerBottom = (centerTop + centerHeight).coerceAtMost(height)
-
-            val outerLeft = ((width - outerWidth) / 2).coerceAtLeast(0)
-            val outerTop = ((height - outerHeight) / 2).coerceAtLeast(0)
-            val outerRight = (outerLeft + outerWidth).coerceAtMost(width)
-            val outerBottom = (outerTop + outerHeight).coerceAtMost(height)
+            // Match the small overlay in the shared visible viewport, including crop offsets.
+            val crop = image.cropRect
+            if (crop.width() < 8 || crop.height() < 8) return
+            val regions = DisplayRegion.regions(crop.left, crop.top, crop.right, crop.bottom)
+            val centerLeft = regions.center.left
+            val centerTop = regions.center.top
+            val centerRight = regions.center.right
+            val centerBottom = regions.center.bottom
+            val outerLeft = regions.outer.left
+            val outerTop = regions.outer.top
+            val outerRight = regions.outer.right
+            val outerBottom = regions.outer.bottom
 
             val topLuma = TopAverage(16)
             val topRed = TopAverage(16)
@@ -70,7 +62,8 @@ class LedFrameAnalyzer(
             var ambientYellow = 0.0
             var ambientCount = 0
 
-            val sampleStep = 2
+            // Sample every pixel so a small LED is not skipped between grid points.
+            val sampleStep = 1
             var y = outerTop
             while (y < outerBottom) {
                 var x = outerLeft

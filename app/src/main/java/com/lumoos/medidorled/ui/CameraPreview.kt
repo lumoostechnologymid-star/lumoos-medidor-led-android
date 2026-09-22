@@ -7,10 +7,8 @@ import androidx.camera.core.UseCaseGroup
 import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
@@ -96,18 +94,18 @@ fun CameraPreview(
 
     Box(modifier = modifier, contentAlignment = Alignment.Center) {
         AndroidView(factory = { previewView }, modifier = Modifier.fillMaxSize())
-        if (displayMode) {
-            Canvas(Modifier.fillMaxSize()) {
-                fun square(fraction: Float, color: Color, strokeWidth: Float) {
-                    val side = size.minDimension * fraction
-                    drawRect(color, Offset((size.width-side)/2, (size.height-side)/2), Size(side,side), style = Stroke(strokeWidth))
-                }
-                square(DisplayRegion.OUTER_FRACTION, Color.White.copy(alpha = 0.45f), 1.dp.toPx())
-                square(DisplayRegion.CENTER_FRACTION, Color.Yellow, 1.dp.toPx())
+        Canvas(Modifier.fillMaxSize()) {
+            fun square(fraction: Float, color: Color, strokeWidth: Float) {
+                val side = size.minDimension * fraction
+                drawRect(
+                    color,
+                    Offset((size.width - side) / 2, (size.height - side) / 2),
+                    Size(side, side),
+                    style = Stroke(strokeWidth)
+                )
             }
-        } else {
-            Box(Modifier.size(138.dp).border(1.dp, Color.White.copy(alpha = 0.45f)))
-            Box(Modifier.size(74.dp).border(2.dp, Color.White))
+            square(DisplayRegion.OUTER_FRACTION, Color.White.copy(alpha = 0.45f), 1.dp.toPx())
+            square(DisplayRegion.CENTER_FRACTION, if (displayMode) Color.Yellow else Color.White, 1.dp.toPx())
         }
     }
 }
