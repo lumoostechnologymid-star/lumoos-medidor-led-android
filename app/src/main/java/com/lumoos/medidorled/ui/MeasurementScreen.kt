@@ -297,6 +297,29 @@ private fun DetectionCard(
             }
             if (expanded) {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    if (!state.isDisplay) {
+                        Text("Respuesta del LED")
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            FilterChip(
+                                selected = state.shortPulses,
+                                onClick = { controller.setShortPulses(true) },
+                                enabled = !state.locked && !state.calibrating,
+                                label = { Text("Pulsos cortos") }
+                            )
+                            FilterChip(
+                                selected = !state.shortPulses,
+                                onClick = { controller.setShortPulses(false) },
+                                enabled = !state.locked && !state.calibrating,
+                                label = { Text("Filtro estable") }
+                            )
+                        }
+                        Text(
+                            if (state.shortPulses)
+                                "Registra destellos de un solo cuadro. Calibra con la iluminación actual; si cuenta reflejos, usa Filtro estable."
+                            else "Exige confirmar el estado en varios cuadros. Reduce cambios aislados, pero puede perder destellos cortos.",
+                            style = MaterialTheme.typography.bodySmall
+                        )
+                    }
                     Text("Tiempo de calibración")
                     Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                         listOf(3, 5, 10, 15).forEach { seconds ->

@@ -14,7 +14,7 @@ enum class LedColorMode {
 }
 
 class LedMeasurementController {
-    private var engine = LedMeasurementEngine(threshold = 20f, hysteresis = 2f)
+    private var engine = LedMeasurementEngine(threshold = 20f, hysteresis = 2f, debounceNs = 0L)
 
     var state by mutableStateOf(MeasurementUiState())
         private set
@@ -35,7 +35,8 @@ class LedMeasurementController {
 
     fun setLedColorMode(mode: LedColorMode) {
         if (state.locked || state.calibrating || state.ledColorMode == mode) return
-        engine = LedMeasurementEngine(threshold = 20f, hysteresis = 2f)
+        engine = LedMeasurementEngine(threshold = 20f, hysteresis = 2f,
+            debounceNs = if (mode == LedColorMode.DISPLAY || !state.shortPulses) 12_000_000L else 0L)
         calibrationStartNs = null
         state = state.copy(
             ledColorMode = mode,
@@ -56,6 +57,16 @@ class LedMeasurementController {
                 LedColorMode.DISPLAY -> "Centra solo el cuadrado superior. Visible → ausente → visible = una vuelta. Calibra antes de medir."
             }
         )
+    }
+
+    fun setShortPulses(enabled: Boolean) {
+        if (state.locked || state.calibrating || state.isDisplay || state.shortPulses == enabled) return
+        engine = LedMeasurementEngine(
+            threshold = state.threshold, hysteresis = state.hysteresis,
+            debounceNs = if (enabled) 0L else 12_000_000L
+        )
+        apply(engine.reset())
+        state = state.copy(shortPulses = enabled)
     }
 
     fun setThreshold(value: Float) {
@@ -182,6 +193,7 @@ data class MeasurementUiState(
     val brightness: Float = 0f,
     val signal: Float = 0f,
     val ledColorMode: LedColorMode = LedColorMode.YELLOW,
+    val shortPulses: Boolean = true,
     val ledOn: Boolean = false,
     val ledKnown: Boolean = false,
     val armed: Boolean = false,
